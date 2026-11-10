@@ -1,9 +1,9 @@
-# omnireview/google
+# omnipulse/google-reviews
 
-Google reviews for [omnisense/omnireview](https://github.com/glitchr-omnisense/omnireview): any
+Google reviews for [omnisense/omnipulse](https://github.com/glitchr-omnisense/omnipulse): any
 place's rating, number of ratings and up to five reviews through the **Places API (New)**; for the
 place's owner, every review and replying through the **Business Profile API** (v4); the link to
-write a review. The gateway calls:
+write a review. The provider calls:
 
 | Operation | API | Request |
 |---|---|---|
@@ -14,17 +14,17 @@ write a review. The gateway calls:
 | token (owner) | OAuth 2.0 | `POST https://oauth2.googleapis.com/token`, `grant_type=refresh_token` |
 | write link | - | `https://search.google.com/local/writereview?placeid={placeId}`, nothing called |
 
-The base addresses are the constants `GoogleGateway::PLACES`, `BUSINESS` and `TOKEN`. Google has no
+The base addresses are the constants `GoogleReviewsProvider::PLACES`, `BUSINESS` and `TOKEN`. Google has no
 sandbox for these APIs.
 
 ## Installation
 
 ```sh
-composer require omnireview/google
+composer require omnipulse/google-reviews
 ```
 
-Requires PHP 8.2, `omnisense/omnireview` (1.x) and `symfony/http-client` (6.4, 7 or 8). In a
-Symfony application with `Omnireview\Bridge\Symfony\OmnireviewBundle`, the factory is registered as
+Requires PHP 8.2, `omnisense/omnipulse` (1.x) and `symfony/http-client` (6.4, 7 or 8). In a
+Symfony application with `Omnipulse\Bridge\Symfony\OmnipulseBundle`, the factory is registered as
 soon as the package is installed, with the application's `http_client`.
 
 ## Credentials
@@ -49,7 +49,7 @@ soon as the package is installed, with the application's `http_client`.
 | `refresh_token` | string | `null` | for the owner's side | the owner's |
 
 Neither the key nor all three of the owner's options is an `InvalidConfigException` when the
-gateway is built. An empty string is "not set" (an environment variable left empty).
+provider is built. An empty string is "not set" (an environment variable left empty).
 
 `Place` fields read: `id` (the place ID), `owner` (the Business Profile location, for the owner's
 side), `name` (used in the Google Maps link of the owner's side).
@@ -64,11 +64,11 @@ side), `name` (used in the Google Maps link of the owner's side).
 | `InviteInterface` | no: Google has no invitation API (share `writeUrl()`) |
 | `WriteUrlInterface` | yes |
 
-`capabilities()->gives()`: `rating, reviews, write-url`, and `reply` with the owner's three.
+`capabilities()->contracts()`: `rating, reviews, writeUrl`, and `reply` with the owner's three.
 
 ## Behaviour
 
-**Which side.** A `Place` with `owner`, on a gateway with the owner's three options, is read from
+**Which side.** A `Place` with `owner`, on a provider with the owner's three options, is read from
 the Business Profile; any other `Place` from the Places API (which needs `api_key`: without it,
 an `InvalidKeyException` `The Places API needs an API key (the api_key option).`).
 
@@ -99,7 +99,7 @@ of an owner's review (URL-encoded). The `Reply` is Google's `comment` and `updat
 owner's three, or with a `Place` without `owner`, a `NotSupportedException` before any call.
 
 **Token.** Asked on the first owner's call: `POST` with `grant_type=refresh_token`, the client id
-and secret and the refresh token, as a form. It is kept in the gateway until 60 seconds before it
+and secret and the refresh token, as a form. It is kept in the provider until 60 seconds before it
 expires (`expires_in`, 3600 when Google does not say), then asked again.
 
 **Write link.** `https://search.google.com/local/writereview?placeid=<id>`, built without a call.
@@ -131,11 +131,11 @@ Profile API for the place's owner, on their own account.
 
 require __DIR__.'/vendor/autoload.php';
 
-use Omnireview\Google\GoogleGatewayFactory;
-use Omnireview\Model\Place;
+use Omnipulse\GoogleReviews\GoogleReviewsFactory;
+use Omnipulse\Model\Place;
 use Symfony\Component\HttpClient\HttpClient;
 
-$google = (new GoogleGatewayFactory(HttpClient::create()))->create([
+$google = (new GoogleReviewsFactory(HttpClient::create()))->create([
     'api_key' => getenv('GOOGLE_PLACES_KEY'),
     'language' => 'fr',
     'client_id' => getenv('GOOGLE_CLIENT_ID'),             // the owner's side, when granted
@@ -164,10 +164,10 @@ if ($google->capabilities()->reply) {
 Not run live (no key). In Symfony:
 
 ```yaml
-omnireview:
-    gateways:
+omnipulse:
+    providers:
         google:
-            factory: google
+            factory: google-reviews
             options:
                 api_key: '%env(GOOGLE_PLACES_KEY)%'
                 language: fr
@@ -177,11 +177,11 @@ omnireview:
 ```
 
 ```twig
-{{ omnireview_widget('google', place_id) }}
+{{ omnipulse_reviews_widget('google', place_id) }}
 ```
 
 The core's harness asks Google for real with the keys in `docker/.env`:
-`docker compose run --rm omnireview bare --live`.
+`docker compose run --rm omnipulse reviews --live`.
 
 ## Errors
 
@@ -194,11 +194,11 @@ The core's harness asks Google for real with the keys in `docker/.env`:
 | no answer, a 5xx, a 429 | `UnreachableException` | the HTTP status |
 | a 2xx body that is not JSON | `ProviderException` | - |
 | `reply()` without the owner's access | `NotSupportedException` | - |
-| neither `api_key` nor the owner's three | `InvalidConfigException`, when the gateway is built | - |
+| neither `api_key` nor the owner's three | `InvalidConfigException`, when the provider is built | - |
 
 ## Verified, and not
 
-Tested offline (`Tests/GoogleGatewayTest.php`, on `MockHttpClient`): the Places rating and
+Tested offline (`Tests/GoogleReviewsProviderTest.php`, on `MockHttpClient`): the Places rating and
 reviews with their authors, Google's translation flagged, the `X-Goog-Api-Key` and field-mask
 headers, `languageCode`; the owner's reviews and reply - the refresh-token grant's form, the
 reviews' URL with `pageSize` and `orderBy`, the reply's `PUT` and body, `updateTime`; the terms,

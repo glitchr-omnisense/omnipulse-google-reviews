@@ -1,21 +1,22 @@
 <?php
 
-namespace Omnireview\Google;
+namespace Omnipulse\GoogleReviews;
 
-use Omnireview\Exception\InvalidKeyException;
-use Omnireview\Exception\NotSupportedException;
-use Omnireview\Exception\ProviderException;
-use Omnireview\Http\Answer;
-use Omnireview\Model\Capabilities;
-use Omnireview\Model\Place;
-use Omnireview\Model\Rating;
-use Omnireview\Model\Reply;
-use Omnireview\Model\Review;
-use Omnireview\Model\Terms;
-use Omnireview\RatingInterface;
-use Omnireview\ReplyInterface;
-use Omnireview\ReviewsInterface;
-use Omnireview\WriteUrlInterface;
+use Omnipulse\Capabilities;
+use Omnipulse\Exception\InvalidKeyException;
+use Omnipulse\Exception\NotSupportedException;
+use Omnipulse\Exception\ProviderException;
+use Omnipulse\Http\Answer;
+use Omnipulse\Model\Place;
+use Omnipulse\Model\Rating;
+use Omnipulse\Model\Reply;
+use Omnipulse\Model\Review;
+use Omnipulse\Model\Terms;
+use Omnipulse\RatingInterface;
+use Omnipulse\ReplyInterface;
+use Omnipulse\ReviewsInterface;
+use Omnipulse\Support\Data;
+use Omnipulse\WriteUrlInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -28,7 +29,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *     GET https://mybusiness.googleapis.com/v4/{accounts/a/locations/l}/reviews,
  *     PUT .../reviews/{reviewId}/reply.
  */
-final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInterface, WriteUrlInterface
+final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, ReplyInterface, WriteUrlInterface
 {
     public const PLACES = 'https://places.googleapis.com/v1/places/';
     public const BUSINESS = 'https://mybusiness.googleapis.com/v4/';
@@ -50,7 +51,7 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
 
     public function getName(): string
     {
-        return 'google';
+        return 'google-reviews';
     }
 
     public function getTitle(): string
@@ -88,11 +89,11 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
         if (null !== $place->owner && $this->owner()) {
             $data = $this->business('GET', $place->owner.'/reviews', ['query' => ['pageSize' => 1]]);
 
-            return new Rating('google', (float) ($data['averageRating'] ?? 0), (int) ($data['totalReviewCount'] ?? 0), url: self::maps($place));
+            return new Rating('google', $data->float('averageRating') ?? 0.0, $data->int('totalReviewCount') ?? 0, url: self::maps($place));
         }
         $data = $this->place($place, 'id,displayName,rating,userRatingCount,googleMapsUri');
 
-        return new Rating('google', (float) ($data['rating'] ?? 0), (int) ($data['userRatingCount'] ?? 0), url: $data['googleMapsUri'] ?? null);
+        return new Rating('google', $data->float('rating') ?? 0.0, $data->int('userRatingCount') ?? 0, url: self::str($data, 'googleMapsUri'));
     }
 
     public function reviews(Place $place, int $limit = 5, ?string $language = null): array
@@ -100,45 +101,45 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
         if (null !== $place->owner && $this->owner()) {
             $data = $this->business('GET', $place->owner.'/reviews', ['query' => ['pageSize' => max(1, min(50, $limit)), 'orderBy' => 'updateTime desc']]);
 
-            return array_slice(array_map(fn (array $r) => new Review(
+            return \array_slice(array_map(fn (Data $r) => new Review(
                 'google',
-                (string) ($r['reviewId'] ?? $r['name'] ?? ''),
-                (float) (self::STARS[$r['starRating'] ?? ''] ?? 0),
-                isset($r['comment']) ? (string) $r['comment'] : null,
-                author: $r['reviewer']['displayName'] ?? null,
-                authorPhoto: $r['reviewer']['profilePhotoUrl'] ?? null,
-                publishedAt: self::date($r['createTime'] ?? null),
+                self::str($r, 'reviewId') ?? self::str($r, 'name') ?? '',
+                (float) (self::STARS[self::str($r, 'starRating') ?? ''] ?? 0),
+                self::str($r, 'comment'),
+                author: self::str($r, 'reviewer.displayName'),
+                authorPhoto: self::str($r, 'reviewer.profilePhotoUrl'),
+                publishedAt: self::date($r->raw('createTime')),
                 // The Business Profile API gives no review its own address: the place on Google Maps.
                 url: self::maps($place),
-                reply: isset($r['reviewReply']['comment']) ? new Reply((string) $r['reviewReply']['comment'], self::date($r['reviewReply']['updateTime'] ?? null)) : null,
-            ), (array) ($data['reviews'] ?? [])), 0, $limit);
+                reply: null !== ($reply = self::str($r, 'reviewReply.comment')) ? new Reply($reply, self::date($r->raw('reviewReply.updateTime'))) : null,
+            ), self::objects($data, 'reviews')), 0, $limit);
         }
 
         $data = $this->place($place, 'id,reviews,googleMapsUri', $language);
 
-        return array_slice(array_map(static fn (array $r) => new Review(
+        return \array_slice(array_map(static fn (Data $r) => new Review(
             'google',
-            (string) ($r['name'] ?? ''),
-            (float) ($r['rating'] ?? 0),
-            $r['text']['text'] ?? $r['originalText']['text'] ?? null,
-            language: $r['text']['languageCode'] ?? $r['originalText']['languageCode'] ?? null,
-            author: $r['authorAttribution']['displayName'] ?? null,
-            authorUrl: $r['authorAttribution']['uri'] ?? null,
-            authorPhoto: $r['authorAttribution']['photoUri'] ?? null,
-            publishedAt: self::date($r['publishTime'] ?? null),
-            url: $r['googleMapsUri'] ?? $data['googleMapsUri'] ?? null,
-            translated: isset($r['text']['languageCode'], $r['originalText']['languageCode']) && $r['text']['languageCode'] !== $r['originalText']['languageCode'],
-        ), (array) ($data['reviews'] ?? [])), 0, $limit);
+            self::str($r, 'name') ?? '',
+            $r->float('rating') ?? 0.0,
+            self::str($r, 'text.text') ?? self::str($r, 'originalText.text'),
+            language: self::str($r, 'text.languageCode') ?? self::str($r, 'originalText.languageCode'),
+            author: self::str($r, 'authorAttribution.displayName'),
+            authorUrl: self::str($r, 'authorAttribution.uri'),
+            authorPhoto: self::str($r, 'authorAttribution.photoUri'),
+            publishedAt: self::date($r->raw('publishTime')),
+            url: self::str($r, 'googleMapsUri') ?? self::str($data, 'googleMapsUri'),
+            translated: null !== $r->raw('text.languageCode') && null !== $r->raw('originalText.languageCode') && $r->raw('text.languageCode') !== $r->raw('originalText.languageCode'),
+        ), self::objects($data, 'reviews')), 0, $limit);
     }
 
     public function reply(Place $place, Review $review, string $text): Reply
     {
         if (!$this->owner() || null === $place->owner) {
-            throw NotSupportedException::operation('google', 'reply', 'replying is the owner\'s, through the Business Profile API: client_id, client_secret, refresh_token, and the Place\'s owner ("accounts/<a>/locations/<l>")');
+            throw NotSupportedException::operation('google-reviews', 'reply', 'replying is the owner\'s, through the Business Profile API: client_id, client_secret, refresh_token, and the Place\'s owner ("accounts/<a>/locations/<l>")');
         }
         $data = $this->business('PUT', $place->owner.'/reviews/'.rawurlencode($review->id).'/reply', ['json' => ['comment' => $text]]);
 
-        return new Reply((string) ($data['comment'] ?? $text), self::date($data['updateTime'] ?? null));
+        return new Reply(self::str($data, 'comment') ?? $text, self::date($data->raw('updateTime')));
     }
 
     public function writeUrl(Place $place): string
@@ -156,11 +157,10 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
         return null !== $this->clientId && null !== $this->clientSecret && null !== $this->refreshToken;
     }
 
-    /** @return array<string, mixed> */
-    private function place(Place $place, string $fields, ?string $language = null): array
+    private function place(Place $place, string $fields, ?string $language = null): Data
     {
         if (null === $this->apiKey) {
-            throw new InvalidKeyException('google', 'The Places API needs an API key (the api_key option).');
+            throw InvalidKeyException::from('google', 'The Places API needs an API key (the api_key option).');
         }
         $answer = Answer::send($this->http, 'google', 'GET', self::PLACES.rawurlencode($place->id), [
             'headers' => ['X-Goog-Api-Key' => $this->apiKey, 'X-Goog-FieldMask' => $fields],
@@ -170,12 +170,8 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
         return $this->read($answer);
     }
 
-    /**
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    private function business(string $method, string $path, array $options): array
+    /** @param array<string, mixed> $options */
+    private function business(string $method, string $path, array $options): Data
     {
         $answer = Answer::send($this->http, 'google', $method, self::BUSINESS.$path, ['headers' => ['Authorization' => 'Bearer '.$this->token()]] + $options);
 
@@ -188,25 +184,39 @@ final class GoogleGateway implements RatingInterface, ReviewsInterface, ReplyInt
             return $this->token;
         }
         $answer = Answer::send($this->http, 'google', 'POST', self::TOKEN, ['body' => ['grant_type' => 'refresh_token', 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret, 'refresh_token' => $this->refreshToken]]);
-        $data = json_decode($answer->body, true);
-        if ($answer->status >= 400 || !isset($data['access_token'])) {
-            throw new InvalidKeyException('google', 'The owner\'s refresh token was refused: '.(\is_array($data) ? ($data['error_description'] ?? $data['error'] ?? '') : ''), \is_array($data) ? ($data['error'] ?? null) : null);
+        $data = Data::of(json_decode($answer->body, true));
+        $token = self::str($data, 'access_token');
+        if ($answer->status >= 400 || null === $token) {
+            throw InvalidKeyException::from('google', 'The owner\'s refresh token was refused: '.(self::str($data, 'error_description') ?? self::str($data, 'error') ?? ''), self::str($data, 'error'));
         }
-        $this->token = (string) $data['access_token'];
-        $this->expires = time() + max(0, (int) ($data['expires_in'] ?? 3600) - 60);
+        $this->token = $token;
+        $this->expires = time() + max(0, ($data->int('expires_in') ?? 3600) - 60);
 
         return $this->token;
     }
 
-    /** @return array<string, mixed> */
-    private function read(Answer $answer): array
+    private function read(Answer $answer): Data
     {
         if ($answer->status < 400) {
-            return '' === trim($answer->body) ? [] : $answer->json();
+            return '' === trim($answer->body) ? new Data() : new Data($answer->json());
         }
-        $error = (array) (json_decode($answer->body, true)['error'] ?? []);
-        $message = \sprintf('HTTP %d, %s: %s', $answer->status, $error['status'] ?? '', $error['message'] ?? mb_substr(trim($answer->body), 0, 200));
-        throw \in_array($answer->status, [401, 403], true) ? new InvalidKeyException('google', $message, $error['status'] ?? null) : new ProviderException('google', $message, $error['status'] ?? null);
+        $error = Data::of(json_decode($answer->body, true))->data('error');
+        $message = \sprintf('HTTP %d, %s: %s', $answer->status, self::str($error, 'status') ?? '', self::str($error, 'message') ?? mb_substr(trim($answer->body), 0, 200));
+        throw \in_array($answer->status, [401, 403], true) ? InvalidKeyException::from('google', $message, self::str($error, 'status')) : ProviderException::from('google', $message, self::str($error, 'status'));
+    }
+
+    /** A value of the answer as it is, when it is a string or a number. */
+    private static function str(Data $data, string $path): ?string
+    {
+        $value = $data->raw($path);
+
+        return \is_scalar($value) ? (string) $value : null;
+    }
+
+    /** @return list<Data> the objects of the list at the path */
+    private static function objects(Data $data, string $path): array
+    {
+        return array_values(array_filter($data->list($path), static fn (Data $item): bool => [] !== $item->values));
     }
 
     private static function date(mixed $value): ?\DateTimeImmutable

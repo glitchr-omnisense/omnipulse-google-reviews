@@ -1,19 +1,24 @@
-# omnireview/google
+# omnipulse/google-reviews
 
-**Google reviews** for [omnisense/omnireview](https://github.com/glitchr-omnisense/omnireview): any
+Formerly `omnireview/google` (moved on 2026-11-10, when omnireview and omnifund merged into
+omnipulse: `Omnireview\Google\` is now `Omnipulse\GoogleReviews\`, `GoogleGateway` is
+`GoogleReviewsProvider`, `GoogleGatewayFactory` is `GoogleReviewsFactory`; the factory is
+`google-reviews` (was `google`); this package replaces the former name).
+
+**Google reviews** for [omnisense/omnipulse](https://github.com/glitchr-omnisense/omnipulse): any
 place's rating, number of ratings and up to five reviews through the Places API (New); for the
 place's owner, every review and replying through the Business Profile API.
 
 ```php
-use Omnireview\Google\GoogleGatewayFactory;
-use Omnireview\Model\Place;
+use Omnipulse\GoogleReviews\GoogleReviewsFactory;
+use Omnipulse\Model\Place;
 
-$gateway = (new GoogleGatewayFactory($httpClient))->create(['api_key' => getenv('GOOGLE_PLACES_KEY'), 'language' => 'fr']);
+$provider = (new GoogleReviewsFactory($httpClient))->create(['api_key' => getenv('GOOGLE_PLACES_KEY'), 'language' => 'fr']);
 
 $place = new Place('ChIJLU7jZClu5kcR4PcOOO6p3I0');     // the place ID: the one thing Google lets you keep
-$gateway->rating($place);                              // 4.6 from 128, with its Google Maps link
-$gateway->reviews($place);                             // up to five, with their authors
-$gateway->writeUrl($place);                            // search.google.com/local/writereview?placeid=...
+$provider->rating($place);                              // 4.6 from 128, with its Google Maps link
+$provider->reviews($place);                             // up to five, with their authors
+$provider->writeUrl($place);                            // search.google.com/local/writereview?placeid=...
 ```
 
 Written from Google's documentation of the Places API (New) and the Business Profile API, read on

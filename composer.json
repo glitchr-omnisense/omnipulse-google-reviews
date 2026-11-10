@@ -1,15 +1,15 @@
 {
-    "name": "omnireview/google",
+    "name": "omnipulse/google-reviews",
     "type": "library",
-    "description": "Omnireview Google: an establishment's Google rating and reviews through the Places API (New) - up to five, with their authors' attribution - and, for its owner, every review and replying through the Business Profile API; the link to leave a review; Google's display and caching rules declared.",
+    "description": "Omnipulse's Google reviews: an establishment's Google rating and reviews through the Places API (New) - up to five, with their authors' attribution - and, for its owner, every review and replying through the Business Profile API; the link to leave a review; Google's display and caching rules declared.",
     "keywords": [
         "reviews",
         "google-reviews",
         "places-api",
         "business-profile",
-        "omnireview"
+        "omnipulse"
     ],
-    "homepage": "https://github.com/glitchr-omnisense/omnireview-google",
+    "homepage": "https://github.com/glitchr-omnisense/omnipulse-google-reviews",
     "license": "MIT",
     "authors": [
         {
@@ -19,15 +19,18 @@
     ],
     "require": {
         "php": ">=8.2",
-        "omnisense/omnireview": "^1.0@dev",
+        "omnisense/omnipulse": "^1.0@dev",
         "symfony/http-client": "^6.4|^7.0|^8.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"
     },
+    "replace": {
+        "omnireview/google": "self.version"
+    },
     "autoload": {
         "psr-4": {
-            "Omnireview\\Google\\": ""
+            "Omnipulse\\GoogleReviews\\": ""
         },
         "exclude-from-classmap": [
             "/Tests/"
@@ -35,7 +38,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Omnireview\\Google\\Tests\\": "Tests/"
+            "Omnipulse\\GoogleReviews\\Tests\\": "Tests/"
         }
     },
     "config": {
