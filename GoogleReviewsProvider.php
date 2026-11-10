@@ -17,6 +17,9 @@ use Omnipulse\ReplyInterface;
 use Omnipulse\ReviewsInterface;
 use Omnipulse\Support\Data;
 use Omnipulse\WriteUrlInterface;
+use Omnisense\Contracts\Policy\Backoff;
+use Omnisense\Contracts\Policy\DeclaresUsagePolicyInterface;
+use Omnisense\Contracts\Policy\UsagePolicy;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -29,8 +32,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *     GET https://mybusiness.googleapis.com/v4/{accounts/a/locations/l}/reviews,
  *     PUT .../reviews/{reviewId}/reply.
  */
-final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, ReplyInterface, WriteUrlInterface
+final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, ReplyInterface, WriteUrlInterface, DeclaresUsagePolicyInterface
 {
+    /** Google reviews's usage policy, as its terms read on the day it says (provenance.verifiedAt). */
+    public const POLICY = __DIR__.'/policy.json';
+
+    private static ?UsagePolicy $policy = null;
+
     public const PLACES = 'https://places.googleapis.com/v1/places/';
     public const BUSINESS = 'https://mybusiness.googleapis.com/v4/';
     public const TOKEN = 'https://oauth2.googleapis.com/token';
@@ -46,6 +54,7 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
         #[\SensitiveParameter] private readonly ?string $clientSecret = null,
         #[\SensitiveParameter] private readonly ?string $refreshToken = null,
         private readonly ?string $language = null,
+        private readonly ?Backoff $backoff = null,
     ) {
     }
 
@@ -59,9 +68,14 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
         return 'Google';
     }
 
+    public function usagePolicy(): UsagePolicy
+    {
+        return self::$policy ??= UsagePolicy::fromFile(self::POLICY);
+    }
+
     public function capabilities(): Capabilities
     {
-        return new Capabilities(rating: true, reviews: true, reply: $this->owner(), invite: false, writeUrl: true);
+        return new Capabilities(rating: true, reviews: true, reply: $this->owner(), invite: false, writeUrl: true, policy: $this->usagePolicy());
     }
 
     public function terms(): Terms
@@ -165,7 +179,7 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
         $answer = Answer::send($this->http, 'google', 'GET', self::PLACES.rawurlencode($place->id), [
             'headers' => ['X-Goog-Api-Key' => $this->apiKey, 'X-Goog-FieldMask' => $fields],
             'query' => array_filter(['languageCode' => $language ?? $this->language]),
-        ]);
+        ], $this->backoff);
 
         return $this->read($answer);
     }
@@ -173,7 +187,7 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
     /** @param array<string, mixed> $options */
     private function business(string $method, string $path, array $options): Data
     {
-        $answer = Answer::send($this->http, 'google', $method, self::BUSINESS.$path, ['headers' => ['Authorization' => 'Bearer '.$this->token()]] + $options);
+        $answer = Answer::send($this->http, 'google', $method, self::BUSINESS.$path, ['headers' => ['Authorization' => 'Bearer '.$this->token()]] + $options, $this->backoff);
 
         return $this->read($answer);
     }

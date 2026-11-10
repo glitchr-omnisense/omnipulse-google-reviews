@@ -49,6 +49,6 @@ final class GoogleReviewsFactory extends ProviderFactory
             throw new InvalidConfigException('The "google-reviews" provider needs an api_key (Places), or the owner\'s client_id, client_secret and refresh_token (Business Profile).');
         }
 
-        return new GoogleReviewsProvider($this->http ?? HttpClient::create(), $c->string('api_key'), $c->string('client_id'), $c->string('client_secret'), $c->string('refresh_token'), $c->string('language'));
+        return new GoogleReviewsProvider($this->http ?? HttpClient::create(), $c->string('api_key'), $c->string('client_id'), $c->string('client_secret'), $c->string('refresh_token'), $c->string('language'), $c->backoff());
     }
 }

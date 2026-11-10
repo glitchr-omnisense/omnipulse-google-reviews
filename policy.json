@@ -1,0 +1,60 @@
+{
+    "$schema": "https://github.com/glitchr-omnisense/contracts/blob/1.x/resources/usage-policy.schema.json",
+    "provider": "google-reviews",
+    "rateLimits": [
+        {
+            "max": 300,
+            "window": "minute",
+            "scope": "application",
+            "operations": [
+                "rating",
+                "reviews",
+                "reply"
+            ],
+            "note": "Business Profile APIs: 300 queries a minute (\"Default requests\"). Places API (New) has a per-minute quota per method per project that Google does not publish as a figure (the Cloud console shows it): the Business Profile figure is written over both, the stricter form. writeUrl makes no call."
+        },
+        {
+            "max": 10,
+            "window": "minute",
+            "scope": "key",
+            "operations": [
+                "reply"
+            ],
+            "note": "\"10 per minute per Google Business Profile\" edits, which cannot be increased; whether a review reply counts as an edit is not said: written for replies, the stricter reading (scope key stands for the profile)."
+        }
+    ],
+    "rights": {
+        "commercial": "unknown",
+        "openSourceRequired": null,
+        "caching": {
+            "permission": "forbidden",
+            "maxTtl": 0
+        },
+        "storage": "forbidden",
+        "redistribution": "forbidden",
+        "attribution": {
+            "required": true,
+            "text": "Google Maps",
+            "url": null,
+            "where": [
+                "display"
+            ]
+        },
+        "licence": null
+    },
+    "requirements": {
+        "key": true,
+        "userAgent": {
+            "required": false,
+            "pattern": null
+        }
+    },
+    "provenance": {
+        "terms": "https://cloud.google.com/maps-platform/terms",
+        "policy": "https://developers.google.com/maps/documentation/places/web-service/policies",
+        "verifiedAt": "2026-11-10",
+        "declaredBy": "maintainer",
+        "contact": null,
+        "notes": "Places policies read on 2026-11-10: Google Maps Content is cached or stored only as the Service Specific Terms allow; place IDs may be stored indefinitely (the provider keeps nothing else); no pre-fetching, indexing, storing or redistributing outside the Services (caching and storage forbidden, maxTtl 0, as Terms::cacheFor 0). Attribution: the Google Maps logo, or the text \"Google Maps\" unchanged where space is short; every review credited to its author (name, photo, profile link; the photo at least); a link to the review on Google Maps (googleMapsUri). Commercial use is not addressed (a paid Google Maps Platform service): unknown. Business Profile limits from developers.google.com/my-business/content/limits: 300 QPM per API, 10 edits a minute per profile. A Places API key, or the owner's OAuth client and refresh token."
+    }
+}

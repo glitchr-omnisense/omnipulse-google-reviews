@@ -26,6 +26,15 @@ Written from Google's documentation of the Places API (New) and the Business Pro
 
 [Documentation](docs/index.md): the options, the calls, Google's terms, what was verified.
 
+## Usage policy
+
+Google reviews's usage policy is declared as data in [`policy.json`](policy.json) (omnisense/contracts'
+schema, named in `composer.json`'s `extra.omnisense.policy`), its terms read on
+2026-11-10 (https://developers.google.com/maps/documentation/places/web-service/policies): 300 calls a minute (the Business Profile APIs' figure, written over Places', whose per-method quota Google does not publish), 10 replies a minute per profile; caching, storage and redistribution forbidden (the place ID alone kept); "Google Maps" credited on display, each review with its author. omnipulse's registry enforces it - a call over a
+limit is never made, a 429 and its `Retry-After` hold every next call
+(`UsageLimitReachedException`) - and a site may tighten it, never loosen it
+(omnisense/omnipulse's docs/policies.md).
+
 ## Responsibility
 
 This package is an independent, unofficial client: it is not affiliated with, endorsed by or
