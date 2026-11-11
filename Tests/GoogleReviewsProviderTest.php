@@ -9,6 +9,7 @@ use Omnipulse\Exception\ProviderException;
 use Omnipulse\GoogleReviews\GoogleReviewsProvider;
 use Omnipulse\GoogleReviews\GoogleReviewsFactory;
 use Omnipulse\Model\Place;
+use Omnipulse\Exception\UsageLimitReachedException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -127,4 +128,18 @@ final class GoogleReviewsProviderTest extends TestCase
     {
         return \is_string($options['body'] ?? null) ? $options['body'] : '';
     }
+
+    public function testTheTokenRequestIsCountedUnderTokenAndNeverSentOverASitesLimit(): void
+    {
+        $provider = $this->provider(['token'], ['client_id' => 'cid', 'client_secret' => 'cs', 'refresh_token' => 'rt', 'policy' => ['rateLimits' => [['max' => 0, 'window' => 'day', 'operations' => ['token']]]]]);
+
+        try {
+            $provider->reviews(new Place(self::PLACE, 'Maison Érable', 'accounts/101/locations/202'), 10);
+            self::fail('The token request went out over the site\'s limit.');
+        } catch (UsageLimitReachedException $e) {
+            self::assertSame('0/day/application/token', $e->limit?->id());
+        }
+        self::assertSame([], $this->calls, 'nothing was sent');
+    }
+
 }

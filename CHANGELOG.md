@@ -2,6 +2,12 @@
 
 ## Unreleased (1.x)
 
+### Changed
+- Token requests counted: the owner's refresh-token request (Business Profile) goes through the provider's guard, checked before it is sent (a
+  site's limit naming `token`, the provider's waits) and counted after, in the registry's limiter.
+  `GoogleReviewsFactory` gives the provider its guard (`Config::guard()`, the constructor's last argument `tokens`): each token request is counted under `token`; the declared limits name their operations and do not count it. Needs omnisense/contracts 16c8da1 or later (`Config::guard()`; 1568f2c, what the sites'
+  vendors hold, has it). Tests/GoogleReviewsProviderTest: a site's limit of 0 tokens a day, the token request never sent.
+
 ### Added
 - Google reviews's usage policy declared as data: `policy.json` (omnisense/contracts' schema), its terms
   read on 2026-11-10, named in `composer.json` (`extra.omnisense.policy`, and

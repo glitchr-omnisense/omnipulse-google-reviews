@@ -19,6 +19,7 @@ use Omnipulse\Support\Data;
 use Omnipulse\WriteUrlInterface;
 use Omnisense\Contracts\Policy\Backoff;
 use Omnisense\Contracts\Policy\DeclaresUsagePolicyInterface;
+use Omnisense\Contracts\Policy\PolicyGuard;
 use Omnisense\Contracts\Policy\UsagePolicy;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -55,6 +56,7 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
         #[\SensitiveParameter] private readonly ?string $refreshToken = null,
         private readonly ?string $language = null,
         private readonly ?Backoff $backoff = null,
+        private readonly ?PolicyGuard $tokens = null,
     ) {
     }
 
@@ -197,7 +199,9 @@ final class GoogleReviewsProvider implements RatingInterface, ReviewsInterface, 
         if (null !== $this->token && time() < $this->expires) {
             return $this->token;
         }
-        $answer = Answer::send($this->http, 'google', 'POST', self::TOKEN, ['body' => ['grant_type' => 'refresh_token', 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret, 'refresh_token' => $this->refreshToken]]);
+        // Counted under "token" by the provider's guard (Config::guard()), its waits honoured before.
+        $ask = fn (): Answer => Answer::send($this->http, 'google', 'POST', self::TOKEN, ['body' => ['grant_type' => 'refresh_token', 'client_id' => $this->clientId, 'client_secret' => $this->clientSecret, 'refresh_token' => $this->refreshToken]]);
+        $answer = null === $this->tokens ? $ask() : $this->tokens->call('token', $ask);
         $data = Data::of(json_decode($answer->body, true));
         $token = self::str($data, 'access_token');
         if ($answer->status >= 400 || null === $token) {
