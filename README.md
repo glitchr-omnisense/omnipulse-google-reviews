@@ -9,6 +9,38 @@ omnipulse: `Omnireview\Google\` is now `Omnipulse\GoogleReviews\`, `GoogleGatewa
 place's rating, number of ratings and up to five reviews through the Places API (New); for the
 place's owner, every review and replying through the Business Profile API.
 
+## Install and a first call
+
+```sh
+composer require omnipulse/google-reviews
+```
+
+No account for this first call: the Places API's answer is recorded
+(`Omnipulse\Testing\RecordedHttpClient` answers in place of the API), so nothing leaves the process.
+A real call needs a Google Cloud project with the Places API (New) enabled and its API key; replying
+to reviews needs the Business Profile API besides.
+
+```php
+<?php
+
+require __DIR__.'/vendor/autoload.php';
+
+use Omnipulse\GoogleReviews\GoogleReviewsFactory;
+use Omnipulse\Model\Place;
+use Omnipulse\Testing\RecordedHttpClient;
+
+// the Places API's answer, recorded: nothing sent. HttpClient::create() (symfony/http-client) for a real call.
+$http = RecordedHttpClient::routes([
+    'GET /places/ChIJLU7jZClu5kcR4PcOOO6p3I0' => '{"id": "ChIJLU7jZClu5kcR4PcOOO6p3I0", "displayName": {"text": "Maison Érable"}, "rating": 4.6, "userRatingCount": 128, "googleMapsUri": "https://maps.google.com/?cid=10223305813012340704", "reviews": []}',
+]);
+$google = (new GoogleReviewsFactory($http))->create(['api_key' => 'recorded', 'language' => 'fr']);
+
+$rating = $google->rating(new Place('ChIJLU7jZClu5kcR4PcOOO6p3I0'));
+echo $rating->value, ' from ', $rating->count, ' reviews, ', $rating->url, "\n";   // 4.6 from 128 reviews, https://maps.google.com/?cid=...
+```
+
+With your credentials, through the family's registry:
+
 ```php
 use Omnipulse\GoogleReviews\GoogleReviewsFactory;
 use Omnipulse\Model\Place;
